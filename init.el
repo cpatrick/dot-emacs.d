@@ -39,10 +39,8 @@
 ; scroll line by line
 (setq scroll-step 1)
 
-; setup search path
-(add-to-list 'load-path "~/Source/cprtools/elisp")
-
 ;; set up cmake mode
+(load "~/.emacs.d/plugins/cmake-mode.el")
 (require 'cmake-mode)
 
 ;; automatically set mode for these file extensions 
