@@ -186,3 +186,5 @@ by using nxml's indentation rules."
         (backward-char) (insert "\n"))
       (indent-region begin end))
     (message "Ah, much better!"))
+
+(setq tab-always-indent 'complete)
