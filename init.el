@@ -1,3 +1,6 @@
+; TABS ARE BAD
+(setq-default indent-tabs-mode nil)
+
 ; frames
 (setq frame-title-format "%b")		; use buffer name for title
 (setq display-buffer-reuse-frames t)    ; no new frame if already open
@@ -12,11 +15,18 @@
 (setq menu-bar-mode nil)
 (setq scroll-bar-mode nil)
 
+; Alt-G should be goto-line
 (global-unset-key "\M-g")
 (global-set-key "\M-g" 'goto-line)
 
+; plugin loading
+(add-to-list 'load-path "~/.emacs.d/plugins")
+
 ; highlight marked region
 (transient-mark-mode t)
+
+; use aspell for spellchecking
+(setq-default ispell-program-name "aspell")
 
 ; make searches case-insensitive
 ;(setq case-fold-search t)
@@ -26,11 +36,27 @@
 
 ; show line and column number in modline
 (line-number-mode t)
+
+; Get proper env... OS X Fix?
+(defun set-exec-path-from-shell-PATH ()
+  (let ((path-from-shell (replace-regexp-in-string
+                          "[ \t\n]*$"
+                          ""
+                          (shell-command-to-string "$SHELL --login -i -c 'echo $PATH'"))))
+    (setenv "PATH" path-from-shell)
+    (setq exec-path (split-string path-from-shell path-separator))))
+
+(when (and window-system (eq system-type 'darwin))
+  ;; When started from Emacs.app or similar, ensure $PATH
+  ;; is the same the user would see in Terminal.app
+  (set-exec-path-from-shell-PATH))
+
+
 (column-number-mode t)
 
 ; font lock in all major modes
-(global-font-lock-mode t)
-(setq font-lock-maximum-decoration t)
+;(global-font-lock-mode t)
+;(setq font-lock-maximum-decoration t)
 
 ; indent by 2, no tabs, syntax hilighting
 (add-hook 'c-mode-common-hook '(lambda ()
@@ -40,15 +66,14 @@
 (setq scroll-step 1)
 
 ;; set up cmake mode
-(load "~/.emacs.d/plugins/cmake-mode.el")
 (require 'cmake-mode)
 
 ;; automatically set mode for these file extensions 
 (setq auto-mode-alist
       (append 
-        '(("CMakeLists\\.txt\\'" . cmake-mode))
-		    '(("\\.cmake\\'"         . cmake-mode))
-	      auto-mode-alist))
+       '(("CMakeLists\\.txt\\'" . cmake-mode))
+       '(("\\.cmake\\'"         . cmake-mode))
+       auto-mode-alist))
 
 ; VTK style
 (defun c-set-indent-vtk ()
@@ -163,12 +188,14 @@
 ; yasnippet
 (add-to-list 'load-path
              "~/.emacs.d/plugins/yasnippet-0.6.1c")
-(require 'yasnippet) ;; not yasnippet-bundle
+(require 'yasnippet)
 (yas/initialize)
 (yas/load-directory "~/.emacs.d/plugins/yasnippet-0.6.1c/snippets")
 
+; Use fill-mode when editing git commit messages
 (setq auto-mode-alist (cons '("COMMIT_EDITMSG$" . auto-fill-mode) auto-mode-alist))
 
+; Function for cleaning up xml
 (load "~/.emacs.d/plugins/nxml-mode-20041004/rng-auto.el")
 (defun bf-pretty-print-xml-region (begin end)
   "Pretty format XML markup in region. You need to have nxml-mode
@@ -185,4 +212,75 @@ by using nxml's indentation rules."
       (indent-region begin end))
     (message "Ah, much better!"))
 
+; Not sure
 (setq tab-always-indent 'complete)
+
+(require 'pymacs)
+(add-to-list 'auto-mode-alist '("\\.py\\'" . python-mode))
+(add-to-list 'interpreter-mode-alist '("python" . python-mode))
+(setq interpreter-mode-alist
+      (cons '("python" . python-mode)
+	    interpreter-mode-alist)
+      python-mode-hook
+      '(lambda () (progn
+		    (set-variable 'py-indent-offset 4)
+		    (set-variable 'py-smart-indentation nil)
+		    (set-variable 'indent-tabs-mode nil) 
+		    ;;(highlight-beyond-fill-column)
+                    (define-key python-mode-map "\C-m" 'newline-and-indent)
+		    )
+      )
+)
+
+;; pymacs
+(autoload 'pymacs-apply "pymacs")
+(autoload 'pymacs-call "pymacs")
+(autoload 'pymacs-eval "pymacs" nil t)
+(autoload 'pymacs-exec "pymacs" nil t)
+(autoload 'pymacs-load "pymacs" nil t)
+
+; flymake for pylint
+(require 'flymake)
+(when (load "flymake" t)
+  (defun flymake-pylint-init ()
+    (let* ((temp-file (flymake-init-create-temp-buffer-copy
+		       'flymake-create-temp-inplace))
+           (local-file (file-relative-name
+                        temp-file
+                        (file-name-directory buffer-file-name))))
+      (list "epylint" (list local-file))))
+  (add-to-list 'flymake-allowed-file-name-masks
+               '("\\.py\\'" flymake-pylint-init)))
+
+;; JSLoad
+(require 'js2-mode)
+(add-to-list 'auto-mode-alist '("\\.js$" . js2-mode))
+
+;; JSLint flymake
+(when (load "flymake" t)
+  (defun flymake-jslint-init ()
+    (let* ((temp-file (flymake-init-create-temp-buffer-copy
+		       'flymake-create-temp-inplace))
+           (local-file (file-relative-name
+                        temp-file
+                        (file-name-directory buffer-file-name))))
+      (list "jslint" (list local-file))))
+
+  (setq flymake-err-line-patterns
+	(cons '("Error:\\([[:digit:]]+\\):\\([[:digit:]]+\\):\\(.*\\)$"
+		nil 1 2 3)
+	      flymake-err-line-patterns))
+
+  (add-to-list 'flymake-allowed-file-name-masks
+               '("\\.js\\'" flymake-jslint-init))
+
+  (require 'flymake-cursor)
+)
+
+(add-hook 'js2-mode-hook
+	  (lambda ()
+      (flymake-mode 1)
+      (define-key js2-mode-map "\C-c\C-n" 'flymake-goto-next-error)))
+
+;; Global flymake
+(add-hook 'find-file-hook 'flymake-find-file-hook)
